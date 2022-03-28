@@ -1,73 +1,89 @@
-// IMPORTS
-const express = require("express");
-const app = express();
-var bodyParser = require("body-parser");
-const path = require("path");
-const { v4: uuidv4 } = require("uuid");
-const server = require("http").Server(app);
-const io = require("socket.io")(server);
-const { ExpressPeerServer } = require("peer");
-const peerServer = ExpressPeerServer(server, {
-  debug: true,
-});
-var urlencodedParser = bodyParser.urlencoded({ extended: true })
+const express = require('express')
+const app = express()
+const server = require('http').Server(app)
+const io = require('socket.io')(server)
+const { v4: uuidV4 } = require('uuid')
 
-//VIEW ENGINE AND STATICS
-app.set("view engine", "ejs");
-app.set('views',path.join(__dirname,'views'));// Set the views directory
-app.use("/static", express.static("./static"));
-app.use("/peerjs", peerServer);
-app.use(express.json());
+app.set('view engine', 'ejs')
+app.use(express.static('public'))
 
-// GET REQUESTS
-app.get('/',(req,res)=>{
-  res.render("menuindex");
+app.get('/', (req, res) => {
+  res.redirect(`/${uuidV4()}`)
 })
-app.get("/new", (req, res) => {
-  const id=uuidv4();
-  console.log(id);
-  res.redirect(`/${id}`);
 
-});
-app.post("/join",urlencodedParser,(req,res)=>{
-  // console.log("Hffhfhf");
-  console.log(req.body.roomid);
-  res.redirect(`/${req.body.roomid}`);
-  // res.redirect('/end');
-  // res.render("index", {roomId: req.body.room_id});
+app.get('/:room', (req, res) => {
+  res.render('room', { roomId: req.params.room })
+})
+const muteUnmute = () => {
+    const enabled = myVideoStream.getAudioTracks()[0].enabled;
+    if (enabled) {
+      myVideoStream.getAudioTracks()[0].enabled = false;
+      setUnmuteButton();
+    } else {
+      myVideoStream.getAudioTracks()[0].enabled = true;
+      setMuteButton();
+    }
+  };
   
-})
-app.get("/end", (req, res) => {
-  // res.sendFile(path.join(__dirname),"./views/ending");
-  res.render("ending.ejs");
-});
-// app.post("/end", (req, res) => {
-//   // res.sendFile(path.join(__dirname),"./views/ending");
-//   res.render("ending.ejs");
-// });
-app.get("/:room", (req, res) => {
-  res.render("index", { roomId: req.params.room });
-});
-
-
-// ROOM JOINING REQUEST
-io.on("connection", (socket) => {
-  socket.on("join-room", (roomId, userid) => {
-    socket.join(roomId);
-    socket.to(roomId).emit("user-connected", userid);
-    console.log("Joined room");
-
-    socket.on("message", (message) => {
-      io.to(roomId).emit("createMessage", message,userid);
-    });
-    socket.on("leaveRoom", () => {
-      socket.leave(roomId);
-      socket.to(roomId).emit("user-disconnected", userid);
-
-      // socket.on("disconnect", () => {
-      // });
-    });
+  const setMuteButton = () => {
+    const html = `<i class="fas fa-microphone"></i>
+    <span>Mute</span>`;
+  
+    document.querySelector(".main__mute_button").innerHTML = html;
+  };
+  
+  const setUnmuteButton = () => {
+    const html = `<i class="unmute fas fa-microphone-slash"></i>
+    <span>Unmute</span>`;
+  
+    document.querySelector(".main__mute_button").innerHTML = html;
+  };
+  
+  const playStop = () => {
+    console.log("object");
+    let enabled = myVideoStream.getVideoTracks()[0].enabled;
+    console.log(enabled);
+    if (enabled) {
+      // console.log(myVideoStream.getVideoTracks()[0].stop());
+      myVideoStream.getVideoTracks()[0].enabled= false;
+  
+      // myVideoStream.setVideoTracks()[0]=false;
+      // myVideoStream.setVideoTracks()[0]=false;
+      setPlayVideo();
+    } else {
+      setStopVideo();
+      myVideoStream.getVideoTracks()[0].enabled= true;
+      // myVideoStream.setVideoTracks()[0]=true;
+    }
+  };
+  
+  const setStopVideo = () => {
+    const html = `
+      <i class="fas fa-video"></i>
+      <span>Stop Video</span>
+    `;
+    document.querySelector(".main__video_button").innerHTML = html;
+  };
+  
+  const setPlayVideo = () => {
+    const html = `
+    <i class="stop fas fa-video-slash"></i>
+      <span>Play Video</span>
+    `;
+    document.querySelector(".main__video_button").innerHTML = html;
+  };
+  
+  document.querySelector(".leave_meeting").addEventListener("click", () => {
+    socket.emit("leaveRoom");
   });
-});
+  
+io.on('connection', socket => {
+  socket.on('join-room', (roomId, userId) => {
+    socket.join(roomId)
+    socket.to(roomId).broadcast.emit('user-connected', userId)
 
-server.listen(3030);
+    socket.on('disconnect', () => {
+      socket.to(roomId).broadcast.emit('user-disconnected', userId)
+    })
+  })
+})
